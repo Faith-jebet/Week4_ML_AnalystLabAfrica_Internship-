@@ -1,0 +1,20 @@
+# Data — raw dataset stays untracked (large / provided resource, kept in
+# Drive per submission instructions); processed outputs ARE tracked as
+# evidence of the pipeline actually running.
+data/raw/*
+!data/raw/.gitkeep
+!data/raw/README.md
+
+# Models — registry log is tracked as evidence; large binary artefacts are not.
+models/*.pkl
+models/*.joblib
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
