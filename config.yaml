@@ -1,0 +1,53 @@
+# HealthConnect ML Engineering — pipeline configuration
+# Week 5: central place for paths/settings so they are not hard-coded
+# across modules.
+# Week 6: now actually loaded via src/config.py (get_config()) instead of
+# being a reference-only file — closes the Week 5 "not yet wired in" item.
+
+data:
+  raw_path: data/raw/HealthConnect_Appointment_Data.csv
+  processed_dir: data/processed/
+  date_format: "%m/%d/%Y"   # observed format — NOT ISO despite the Data Dictionary
+
+cleaning:
+  distance_impute_strategy: median_by_age_group
+  reminder_channel_fill_value: "None"
+
+target:
+  positive_class: "No-Show"
+  excluded_outcome: "Cancelled"   # dropped from modelling, not encoded as 0
+
+features:
+  excluded_columns:
+    - waiting_time_minutes   # not available at prediction time
+    - appointment_id
+    - patient_id
+    - appointment_outcome
+  redundant_history_columns:   # Week 6: dropped — see build_features.py docstring
+    - previous_appointments
+    - previous_no_shows
+  categorical_columns:
+    - gender
+    - age_group
+    - appointment_type
+    - appointment_day
+    - appointment_time
+    - reminder_sent
+    - reminder_channel
+
+split:
+  strategy: time_aware
+  date_column: appointment_date
+  test_fraction: 0.2
+
+model:
+  registry_dir: models/
+  baseline_algorithm: LogisticRegression
+  candidate_algorithms:        # Week 6: models compared against the baseline
+    - RandomForestClassifier
+    - LogisticRegression_refined
+  selection_metric: roc_auc
+
+risk_tiers:
+  low_max: 0.33
+  medium_max: 0.66

@@ -1,0 +1,28 @@
+{
+  "version": "v20260909_195941",
+  "selection_metric": "roc_auc",
+  "recommended_model": "refined_logreg",
+  "results": {
+    "baseline_logreg": {
+      "accuracy": 0.6203,
+      "precision": 0.6268,
+      "recall": 0.6294,
+      "f1": 0.6281,
+      "roc_auc": 0.6733
+    },
+    "refined_logreg": {
+      "accuracy": 0.6234,
+      "precision": 0.6376,
+      "recall": 0.6046,
+      "f1": 0.6206,
+      "roc_auc": 0.6734
+    },
+    "random_forest": {
+      "accuracy": 0.6224,
+      "precision": 0.6305,
+      "recall": 0.6253,
+      "f1": 0.6279,
+      "roc_auc": 0.6724
+    }
+  }
+}
