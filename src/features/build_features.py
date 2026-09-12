@@ -15,6 +15,7 @@ docs/PIPELINE.md, Cross-Track Collaboration):
   as 0 — a cancellation is a different event (patient proactively frees
   the slot) from a genuine no-show, and blending them would teach the
   model a misleading distinction. This matches the Week 4 design.
+<<<<<<< HEAD
 
 Week 6 update: previous_appointments and previous_no_shows are now
 EXCLUDED from the final feature matrix (they remain available upstream
@@ -26,6 +27,8 @@ model harder to interpret without improving its predictions. The
 engineered ratio (no_show_rate_history) plus is_first_time_patient
 already carry this information in a cleaner form. See
 docs/PIPELINE.md §9 (Week 6) for the full analysis.
+=======
+>>>>>>> origin/main
 """
 
 import pandas as pd
@@ -36,9 +39,12 @@ import pandas as pd
 # exclusion is a production-availability rule, not a data-quality patch.
 EXCLUDED_COLUMNS = ["waiting_time_minutes", "appointment_id", "patient_id", "appointment_outcome"]
 
+<<<<<<< HEAD
 # Week 6: redundant raw counts, superseded by engineered features (see module docstring)
 REDUNDANT_HISTORY_COLUMNS = ["previous_appointments", "previous_no_shows"]
 
+=======
+>>>>>>> origin/main
 CATEGORICAL_COLUMNS = [
     "gender", "age_group", "appointment_type", "appointment_day",
     "appointment_time", "reminder_sent", "reminder_channel",
@@ -85,7 +91,10 @@ def build_feature_matrix(df: pd.DataFrame) -> pd.DataFrame:
     out = pd.get_dummies(out, columns=CATEGORICAL_COLUMNS, drop_first=True)
 
     drop_cols = [c for c in EXCLUDED_COLUMNS if c in out.columns]
+<<<<<<< HEAD
     drop_cols += [c for c in REDUNDANT_HISTORY_COLUMNS if c in out.columns]  # Week 6 refinement
+=======
+>>>>>>> origin/main
     drop_cols += ["booking_date", "appointment_date"]  # raw dates not used directly as features
     out = out.drop(columns=drop_cols)
 

@@ -1,8 +1,13 @@
 # HealthConnect ML Engineering — pipeline configuration
 # Week 5: central place for paths/settings so they are not hard-coded
+<<<<<<< HEAD
 # across modules.
 # Week 6: now actually loaded via src/config.py (get_config()) instead of
 # being a reference-only file — closes the Week 5 "not yet wired in" item.
+=======
+# across modules. Referenced informally in Week 5; a formal config loader
+# is a Week 6+ improvement (see docs/PIPELINE.md, Implementation Issues).
+>>>>>>> origin/main
 
 data:
   raw_path: data/raw/HealthConnect_Appointment_Data.csv
@@ -23,9 +28,12 @@ features:
     - appointment_id
     - patient_id
     - appointment_outcome
+<<<<<<< HEAD
   redundant_history_columns:   # Week 6: dropped — see build_features.py docstring
     - previous_appointments
     - previous_no_shows
+=======
+>>>>>>> origin/main
   categorical_columns:
     - gender
     - age_group
@@ -43,10 +51,13 @@ split:
 model:
   registry_dir: models/
   baseline_algorithm: LogisticRegression
+<<<<<<< HEAD
   candidate_algorithms:        # Week 6: models compared against the baseline
     - RandomForestClassifier
     - LogisticRegression_refined
   selection_metric: roc_auc
+=======
+>>>>>>> origin/main
 
 risk_tiers:
   low_max: 0.33

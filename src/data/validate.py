@@ -99,6 +99,7 @@ def quality_report(df: pd.DataFrame) -> pd.DataFrame:
     return report.sort_values("missing_count", ascending=False).reset_index(drop=True)
 
 
+<<<<<<< HEAD
 def validate_feature_matrix_contract(df: pd.DataFrame, expected_columns: list) -> list:
     """
     Week 6: pipeline input/output contract check for the model interface.
@@ -122,6 +123,8 @@ def validate_feature_matrix_contract(df: pd.DataFrame, expected_columns: list) -
     return issues
 
 
+=======
+>>>>>>> origin/main
 if __name__ == "__main__":
     path = "data/raw/HealthConnect_Appointment_Data.csv"
     print(f"Loading: {path}")
