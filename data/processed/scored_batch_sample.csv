@@ -1,5 +1,4 @@
 appointment_id,no_show_probability,risk_tier,model_version
-<<<<<<< HEAD
 HC-03750,0.6624,High,candidate_recommended_refined_logreg_v20260909_195941
 HC-00067,0.4141,Medium,candidate_recommended_refined_logreg_v20260909_195941
 HC-02287,0.5148,Medium,candidate_recommended_refined_logreg_v20260909_195941
@@ -471,7 +470,6 @@ HC-00820,0.425,Medium,candidate_recommended_refined_logreg_v20260909_195941
 HC-01169,0.7231,High,candidate_recommended_refined_logreg_v20260909_195941
 HC-03712,0.5493,Medium,candidate_recommended_refined_logreg_v20260909_195941
 HC-03122,0.7241,High,candidate_recommended_refined_logreg_v20260909_195941
-=======
 HC-03750,0.6854,High,v20260904_191801
 HC-00067,0.4303,Medium,v20260904_191801
 HC-02287,0.5375,Medium,v20260904_191801
@@ -943,4 +941,4 @@ HC-00820,0.4421,Medium,v20260904_191801
 HC-01169,0.7555,High,v20260904_191801
 HC-03712,0.5378,Medium,v20260904_191801
 HC-03122,0.7397,High,v20260904_191801
->>>>>>> origin/main
+

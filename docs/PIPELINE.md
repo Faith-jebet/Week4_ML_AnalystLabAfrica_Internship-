@@ -1,7 +1,6 @@
 # HealthConnect ML Pipeline — Documentation
 
 **Track:** Machine Learning Engineering
-<<<<<<< HEAD
 **Status:** Week 6 — integrated pipeline (pluggable model registry, input/output
 validation contracts, config wired in, 30 passing tests). Week 5 section below
 is kept as history; see §9 for what changed.
@@ -18,7 +17,7 @@ is kept as history; see §9 for what changed.
 | Inference | `src/inference/score.py` | Loads the latest **recommended** model (not just latest file), validates the input feature contract, scores a batch, validates output before saving |
 | Unit tests | `tests/test_pipeline.py` | 15 tests — validation, cleaning, feature-engineering (Week 5, still passing unchanged) |
 | Integration tests | `tests/test_integration.py` | 15 tests — config, model registry, input/output contracts, end-to-end scoring, and documented-command reproducibility (Week 6, new) |
-=======
+
 **Status:** Week 5 — initial implementation (data processing + feature pipeline +
 baseline model integration, run end-to-end against the real dataset)
 
@@ -32,7 +31,6 @@ baseline model integration, run end-to-end against the real dataset)
 | Training (smoke test) | `src/training/train.py` | Time-aware train/test split, fits a baseline Logistic Regression, evaluates it, saves a versioned model artefact + registry log row |
 | Inference | `src/inference/score.py` | Loads the latest model, scores a batch through the same cleaning/feature path, outputs probability + risk tier |
 | Tests | `tests/test_pipeline.py` | 15 tests covering validation, cleaning, and feature-engineering behaviour |
->>>>>>> origin/main
 
 Run order for a full pipeline pass:
 ```bash
@@ -152,7 +150,6 @@ leakage prevention (excluded columns verified absent from the output matrix).
   treatment of `Cancelled`, or additional features), the shared modules in
   `src/features/build_features.py` will need to be updated to match — see
   Cross-Track Collaboration in the Week 5 report.
-<<<<<<< HEAD
 
 ## 9. Week 6 — Integration & Validation
 
@@ -248,5 +245,4 @@ See `docs/ISSUE_LOG.md` for all 10 issues found this week (7 resolved, 3 open).
   at minimum, a data-drift check comparing a new batch's `appointment_type`/
   `age_group` distribution against the training distribution.
 - Fairness/bias testing on `gender` and `age` (carried-forward open item).
-=======
->>>>>>> origin/main
+

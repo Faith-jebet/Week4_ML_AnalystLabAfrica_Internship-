@@ -1,5 +1,4 @@
 """
-<<<<<<< HEAD
 Batch inference module (Week 6: integrated + validated).
 
 Changes from Week 5:
@@ -16,7 +15,6 @@ Changes from Week 5:
 
 import glob
 import json
-=======
 Batch inference module.
 
 Responsibility:
@@ -32,13 +30,11 @@ work, per the Week 4 design.
 """
 
 import glob
->>>>>>> origin/main
 from pathlib import Path
 
 import joblib
 import pandas as pd
 
-<<<<<<< HEAD
 from src.config import get_config, get_logger
 from src.data.clean import clean_appointments
 from src.data.validate import load_data, validate_feature_matrix_contract
@@ -73,7 +69,6 @@ def risk_tier(prob: float, cfg: dict) -> str:
     if prob < thresholds["low_max"]:
         return "Low"
     if prob < thresholds["medium_max"]:
-=======
 from src.data.clean import clean_appointments
 from src.data.validate import load_data
 from src.features.build_features import build_target, build_feature_matrix
@@ -96,12 +91,11 @@ def risk_tier(prob: float) -> str:
     if prob < RISK_THRESHOLDS["low"]:
         return "Low"
     if prob < RISK_THRESHOLDS["medium"]:
->>>>>>> origin/main
+
         return "Medium"
     return "High"
 
 
-<<<<<<< HEAD
 def validate_scores(result: pd.DataFrame, expected_rows: int) -> None:
     """
     Week 6: explicit output validation. Raises if the batch output is not
@@ -126,34 +120,29 @@ def validate_scores(result: pd.DataFrame, expected_rows: int) -> None:
 
 
 def score_batch(df_raw: pd.DataFrame, model, feature_columns, cfg: dict) -> pd.DataFrame:
-=======
+
 def score_batch(df_raw: pd.DataFrame, model, feature_columns) -> pd.DataFrame:
->>>>>>> origin/main
+
     cleaned = clean_appointments(df_raw)
     targeted = build_target(cleaned)  # drops Cancelled — same rule as training
     features = build_feature_matrix(targeted).drop(columns=["is_no_show"], errors="ignore")
     features = features.reindex(columns=feature_columns, fill_value=0)
 
-<<<<<<< HEAD
     contract_issues = validate_feature_matrix_contract(features, feature_columns)
     if contract_issues:
         raise ValueError("Model input contract violated: " + "; ".join(contract_issues))
 
-=======
->>>>>>> origin/main
     probs = model.predict_proba(features)[:, 1]
     result = pd.DataFrame({
         "appointment_id": targeted["appointment_id"].values,
         "no_show_probability": probs.round(4),
     })
-<<<<<<< HEAD
+
     result["risk_tier"] = result["no_show_probability"].apply(lambda p: risk_tier(p, cfg))
 
     validate_scores(result, expected_rows=len(targeted))
-=======
+
     result["risk_tier"] = result["no_show_probability"].apply(risk_tier)
->>>>>>> origin/main
-    return result
 
 
 if __name__ == "__main__":
@@ -181,7 +170,7 @@ if __name__ == "__main__":
     out_path = Path(cfg["data"]["processed_dir"]) / "scored_batch_sample.csv"
     scored.to_csv(out_path, index=False)
     log.info("Saved scored batch to: %s", out_path)
-=======
+
     model_path = latest_model_path()
     print(f"Loading model: {model_path}")
     model = joblib.load(model_path)
@@ -206,4 +195,4 @@ if __name__ == "__main__":
     out_path = Path("data/processed") / "scored_batch_sample.csv"
     scored.to_csv(out_path, index=False)
     print(f"\nSaved scored batch to: {out_path}")
->>>>>>> origin/main
+
