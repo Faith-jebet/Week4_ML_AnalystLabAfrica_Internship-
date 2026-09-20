@@ -19,10 +19,10 @@ import pytest
 from src.config import get_config
 from src.data.validate import load_data, validate_feature_matrix_contract
 from src.data.clean import clean_appointments
-from src.features.build_features import build_target, build_feature_matrix
+from src.features.build_features import build_target, build_feature_matrix, fit_feature_params
 from src.training.train import MODEL_FACTORY, time_aware_split, validate_training_inputs
 from src.inference.score import (
-    latest_recommended_model_path, score_batch, validate_scores, risk_tier,
+    latest_recommended_model_path, score_batch, validate_scores, risk_tier, load_feature_params,
 )
 
 DATA_PATH = "data/raw/HealthConnect_Appointment_Data.csv"
@@ -69,8 +69,9 @@ def test_model_factory_has_multiple_candidates():
 def test_all_registered_models_are_fittable_and_predict_probabilities(prepared_data):
     _, targeted = prepared_data
     train_raw, test_raw, _ = time_aware_split(targeted, "appointment_date")
-    train_feat = build_feature_matrix(train_raw).drop(columns=["is_no_show"])
-    test_feat = build_feature_matrix(test_raw).drop(columns=["is_no_show"])
+    feature_params = fit_feature_params(train_raw)
+    train_feat = build_feature_matrix(train_raw, feature_params).drop(columns=["is_no_show"])
+    test_feat = build_feature_matrix(test_raw, feature_params).drop(columns=["is_no_show"])
     train_feat, test_feat = train_feat.align(test_feat, join="left", axis=1, fill_value=0)
     y_train = train_raw["is_no_show"].values
 
@@ -155,14 +156,138 @@ def test_score_batch_end_to_end(prepared_data):
     cfg = get_config()
     model_path = latest_recommended_model_path()
     model = joblib.load(model_path)
-    feature_columns = list(build_feature_matrix(targeted).drop(columns=["is_no_show"]).columns)
+    feature_params = load_feature_params()
+    feature_columns = list(model.feature_names_in_) if hasattr(model, "feature_names_in_") else \
+        list(build_feature_matrix(targeted, feature_params).drop(columns=["is_no_show"]).columns)
 
     batch = raw.sort_values("appointment_date").tail(50)
-    result = score_batch(batch, model, feature_columns, cfg)
+    result = score_batch(batch, model, feature_columns, cfg, feature_params)
 
     assert len(result) <= len(batch)  # Cancelled rows dropped
     assert result["no_show_probability"].between(0, 1).all()
     assert result["risk_tier"].isin(["Low", "Medium", "High"]).all()
+
+
+# ---------- Week 7: edge-case / robustness tests ----------
+# These were written AFTER manually probing the pipeline and finding two real
+# bugs — see docs/ISSUE_LOG.md #11 and #12, and docs/PIPELINE.md §11 for the
+# full before/after. Kept here (not in test_pipeline.py) since they test
+# integration behaviour under adversarial conditions, not unit correctness.
+
+def test_single_row_batch_produces_full_column_set(prepared_data):
+    """
+    Week 7 regression test for Issue #11: a single-row batch used to produce
+    a feature matrix with ~9 columns instead of ~30, because pd.get_dummies
+    only creates columns for categories present in that specific batch.
+    """
+    raw, targeted = prepared_data
+    feature_params = fit_feature_params(targeted)
+    full_columns = set(build_feature_matrix(targeted, feature_params).columns) - {"is_no_show"}
+
+    single_row = targeted.iloc[[0]]
+    single_columns = set(build_feature_matrix(single_row, feature_params).columns) - {"is_no_show"}
+
+    assert single_columns == full_columns, (
+        f"Single-row batch produced a different column set. "
+        f"Missing: {full_columns - single_columns}, Extra: {single_columns - full_columns}"
+    )
+
+
+def test_skewed_batch_all_same_category_produces_full_column_set(prepared_data):
+    """Week 7: a batch where every row shares the same category value should still encode fully."""
+    raw, targeted = prepared_data
+    feature_params = fit_feature_params(targeted)
+    full_columns = set(build_feature_matrix(targeted, feature_params).columns) - {"is_no_show"}
+
+    skewed = targeted[targeted["appointment_type"] == targeted["appointment_type"].iloc[0]]
+    skewed_columns = set(build_feature_matrix(skewed, feature_params).columns) - {"is_no_show"}
+
+    assert skewed_columns == full_columns
+
+
+def test_long_lead_time_threshold_is_fixed_not_recomputed_per_batch(prepared_data):
+    """
+    Week 7 regression test for Issue #12: long_lead_time used to be
+    recomputed as the 75th percentile of whatever batch was passed in — so
+    a single-row batch always flagged itself as "long lead time" (its own
+    value is trivially its own 75th percentile). With a fitted, fixed
+    threshold, a short-lead-time appointment must score 0 even when it's
+    the only row in the batch.
+    """
+    raw, targeted = prepared_data
+    feature_params = fit_feature_params(targeted)
+
+    short_lead = targeted.iloc[[0]].copy()
+    short_lead["booking_lead_days"] = 1  # well below any realistic 75th percentile
+
+    result = build_feature_matrix(short_lead, feature_params)
+    assert result["long_lead_time"].iloc[0] == 0
+
+
+def test_unseen_category_does_not_crash_and_is_logged(prepared_data, caplog):
+    """Week 7: a category value not present during fitting should be handled gracefully, not raise."""
+    import logging
+    raw, targeted = prepared_data
+    feature_params = fit_feature_params(targeted)
+
+    mutated = targeted.iloc[[0]].copy()
+    mutated["appointment_type"] = "Telehealth Consult"  # not a real category in this dataset
+
+    with caplog.at_level(logging.WARNING, logger="features"):
+        result = build_feature_matrix(mutated, feature_params)  # should not raise
+    assert result.isna().sum().sum() == 0  # unseen category should not introduce NaNs into the output
+
+
+def test_empty_batch_scores_without_error(prepared_data):
+    """Week 7: an empty batch (0 rows) should return an empty, correctly-shaped result, not crash."""
+    if not glob.glob("models/candidate_recommended_*.joblib") and not glob.glob("models/baseline_logreg_*.joblib"):
+        pytest.skip("No trained model artefact present — run `python -m src.training.train` first.")
+
+    raw, targeted = prepared_data
+    cfg = get_config()
+    model_path = latest_recommended_model_path()
+    model = joblib.load(model_path)
+    feature_params = load_feature_params()
+    feature_columns = list(model.feature_names_in_)
+
+    empty_batch = raw.iloc[0:0]
+    result = score_batch(empty_batch, model, feature_columns, cfg, feature_params)
+    assert len(result) == 0
+    assert list(result.columns) == ["appointment_id", "no_show_probability", "risk_tier"]
+
+
+def test_all_cancelled_batch_scores_without_error(prepared_data):
+    """Week 7: a batch that is entirely Cancelled appointments should score to 0 rows, not crash."""
+    if not glob.glob("models/candidate_recommended_*.joblib") and not glob.glob("models/baseline_logreg_*.joblib"):
+        pytest.skip("No trained model artefact present — run `python -m src.training.train` first.")
+
+    raw = load_data(DATA_PATH)
+    from src.data.clean import clean_appointments as _clean
+    cleaned_raw = _clean(raw)
+    all_cancelled = cleaned_raw[cleaned_raw["appointment_outcome"] == "Cancelled"]
+    assert len(all_cancelled) > 0, "test fixture assumption failed — no Cancelled rows in dataset"
+
+    cfg = get_config()
+    model_path = latest_recommended_model_path()
+    model = joblib.load(model_path)
+    feature_params = load_feature_params()
+    feature_columns = list(model.feature_names_in_)
+
+    result = score_batch(all_cancelled, model, feature_columns, cfg, feature_params)
+    assert len(result) == 0
+
+
+def test_missing_required_column_raises_clear_error(prepared_data):
+    """
+    Week 7: dropping a required column entirely should fail loudly with a
+    clear error, not an opaque KeyError deep inside cleaning logic.
+    Documents CURRENT behaviour (Issue #13, open) — this is a case Week 7
+    testing found but did not yet fix, tracked honestly rather than ignored.
+    """
+    raw, _ = prepared_data
+    broken = raw.drop(columns=["distance_to_clinic_km"])
+    with pytest.raises(KeyError):
+        clean_appointments(broken)
 
 
 def test_pipeline_reproducible_via_documented_commands():

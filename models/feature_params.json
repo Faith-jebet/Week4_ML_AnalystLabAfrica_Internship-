@@ -1,0 +1,48 @@
+{
+  "category_levels": {
+    "gender": [
+      "Female",
+      "Male",
+      "Prefer not to say"
+    ],
+    "age_group": [
+      "18-24",
+      "25-34",
+      "35-44",
+      "45-54",
+      "55-64",
+      "65+"
+    ],
+    "appointment_type": [
+      "Diagnostic Test",
+      "Follow-up",
+      "General Consultation",
+      "Specialist Consultation"
+    ],
+    "appointment_day": [
+      "Friday",
+      "Monday",
+      "Saturday",
+      "Sunday",
+      "Thursday",
+      "Tuesday",
+      "Wednesday"
+    ],
+    "appointment_time": [
+      "Afternoon",
+      "Evening",
+      "Morning"
+    ],
+    "reminder_sent": [
+      "No",
+      "Yes"
+    ],
+    "reminder_channel": [
+      "Email",
+      "None",
+      "SMS",
+      "WhatsApp"
+    ]
+  },
+  "long_lead_time_threshold": 44.0
+}

@@ -1,9 +1,10 @@
 # HealthConnect ML Pipeline — Documentation
 
 **Track:** Machine Learning Engineering
-**Status:** Week 6 — integrated pipeline (pluggable model registry, input/output
-validation contracts, config wired in, 30 passing tests). Week 5 section below
-is kept as history; see §9 for what changed.
+**Status:** Week 7 — pipeline tested, refined, and validated against
+adversarial/edge-case inputs (37 passing tests: 15 unit + 15 Week 6
+integration + 7 Week 7 edge-case). Two real train/serve skew bugs found and
+fixed. See §11.
 
 ## 1. Pipeline Stages (current, Week 6)
 
@@ -17,20 +18,6 @@ is kept as history; see §9 for what changed.
 | Inference | `src/inference/score.py` | Loads the latest **recommended** model (not just latest file), validates the input feature contract, scores a batch, validates output before saving |
 | Unit tests | `tests/test_pipeline.py` | 15 tests — validation, cleaning, feature-engineering (Week 5, still passing unchanged) |
 | Integration tests | `tests/test_integration.py` | 15 tests — config, model registry, input/output contracts, end-to-end scoring, and documented-command reproducibility (Week 6, new) |
-
-**Status:** Week 5 — initial implementation (data processing + feature pipeline +
-baseline model integration, run end-to-end against the real dataset)
-
-## 1. Pipeline Stages
-
-| Stage | Module | What it does |
-|---|---|---|
-| Validation | `src/data/validate.py` | Loads the CSV, checks schema against the Data Dictionary, runs cross-field consistency checks, produces a missing-value report |
-| Cleaning | `src/data/clean.py` | Imputes/fills missing values with documented, reproducible rules; never edits `data/raw` |
-| Feature engineering | `src/features/build_features.py` | Builds the binary target, drops `Cancelled` rows, derives behavioural features, one-hot encodes categoricals, excludes non-production-available columns |
-| Training (smoke test) | `src/training/train.py` | Time-aware train/test split, fits a baseline Logistic Regression, evaluates it, saves a versioned model artefact + registry log row |
-| Inference | `src/inference/score.py` | Loads the latest model, scores a batch through the same cleaning/feature path, outputs probability + risk tier |
-| Tests | `tests/test_pipeline.py` | 15 tests covering validation, cleaning, and feature-engineering behaviour |
 
 Run order for a full pipeline pass:
 ```bash
@@ -246,3 +233,121 @@ See `docs/ISSUE_LOG.md` for all 10 issues found this week (7 resolved, 3 open).
   `age_group` distribution against the training distribution.
 - Fairness/bias testing on `gender` and `age` (carried-forward open item).
 
+## 10. Week 7 — Pipeline Testing, Reliability & Refinement
+
+### 10.1 Test Plan (per Week 6's §9.6 plan, executed this week)
+
+Before writing formal tests, the pipeline was deliberately probed with
+adversarial inputs to find real weaknesses rather than only testing what
+was already known to work:
+
+| Scenario | Why it matters |
+|---|---|
+| Single-row batch | The realistic minimum real-world inference request — one new appointment |
+| Batch where every row shares one category value | Tests whether encoding depends on batch composition |
+| Empty batch (0 rows) | Should degrade gracefully, not crash |
+| Batch that is entirely `Cancelled` appointments | Should score to 0 rows after target filtering, not crash |
+| A category value never seen during training | Should be handled predictably, not crash silently or loudly |
+| A required column dropped entirely | Should fail with a clear, diagnosable error |
+| All-null `distance_to_clinic_km` for one entire `age_group` | Tests the median-imputation fallback logic |
+
+### 10.2 Test Results
+
+| Test/Scenario | Expected Result | Actual Result (before fix) | Pass/Fail | Issue Identified | Action Taken | Retest Result |
+|---|---|---|---|---|---|---|
+| Single-row batch | Same ~30-column feature matrix as full data | Only 9 columns produced | **FAIL** | Issue #11 — `pd.get_dummies` encodes only categories present in the batch | Added `fit_feature_params()` + `pd.Categorical` with fixed levels | **PASS** — identical column set, and `HC-00001` scores the same probability (0.3959) whether alone or in a batch |
+| Skewed batch (1 category value only) | Same column set as full data | Fewer columns produced | **FAIL** | Same as #11 | Same fix | **PASS** |
+| Single-row batch, short `booking_lead_days` | `long_lead_time` = 0 | `long_lead_time` = 1 (always, for any single-row batch) | **FAIL** | Issue #12 — threshold recomputed per-batch, and a lone row's value is trivially its own 75th percentile | Threshold now fit once on the training set, reused at inference | **PASS** — confirmed 0 for a 1-day lead time even as the only row in the batch |
+| Empty batch | 0 scored rows, no crash | Ran without error, but not covered by a test | **PASS** (already worked) | None | Added an explicit test (`test_empty_batch_scores_without_error`) and an early-return path in `score_batch` for the 0-row case, since it previously reached `model.predict_proba` on a 0-row frame by luck rather than by design | **PASS** |
+| All-`Cancelled` batch | 0 scored rows, no crash | Ran without error | **PASS** (already worked) | None | Added explicit test (`test_all_cancelled_batch_scores_without_error`) to lock in the behaviour | **PASS** |
+| Unseen category value | No crash; predictable, logged handling | Silently encoded as all-zero (reference category), no visibility | **PARTIAL PASS** | Not a crash, but silent — a real analyst/ops reviewer would have no way to know this happened | Added a `log.warning()` whenever an unseen value is encountered, naming the column and row count affected | **PASS** — behaviour unchanged (still scored as reference category, which is the best available fallback) but now **observable** |
+| Missing required column (`distance_to_clinic_km` dropped) | Clear, actionable error | Raw `KeyError: 'Column not found: distance_to_clinic_km'` deep inside cleaning logic | **FAIL** (poor error quality, not a crash-worthy bug) | Issue #13 | Documented and pinned with a test asserting current behaviour; a clearer message is a Week 8 cleanup (see §10.6) | **Unresolved — tracked, not blocking** |
+| All-null `distance_to_clinic_km` for one full `age_group` | Falls back to the overall median, 0 missing after cleaning | Worked correctly on first try | **PASS** | None | None needed | **PASS** |
+
+### 10.3 Root Cause Analysis — Issues #11 and #12
+
+Both bugs share the same underlying category of mistake: **deriving a
+"fitted" parameter (category levels, a percentile threshold) from whatever
+data happens to be passed in, instead of fixing it once from the training
+set and reusing it unchanged.** This is the textbook definition of
+train/serve skew, and it's exactly the kind of bug that a pipeline which
+only ever gets tested on full-dataset batches (as Week 5 and Week 6 always
+did) will never surface — every real inference request in production is a
+small batch, which is precisely the case that was never exercised until
+this week's deliberate adversarial testing.
+
+**General principle extracted for future feature work:** any statistic
+computed from `df` inside `build_feature_matrix` (a quantile, a category
+list, a mean, anything) is a red flag unless it's explicitly documented as
+using a value fitted once elsewhere. This is now called out directly in
+`build_features.py`'s module docstring for future reference.
+
+### 10.4 Fix Implementation
+
+- `fit_feature_params(df)` (new, in `build_features.py`) — computes and
+  returns `{"category_levels": {...}, "long_lead_time_threshold": float}`
+  from a reference (training) DataFrame.
+- `build_feature_matrix(df, feature_params=None)` — now accepts the fitted
+  params; when provided, category encoding uses `pd.Categorical` with
+  fixed categories (unseen values become `NaN` → all-zero dummy row, with
+  a logged warning) and `long_lead_time` uses the fixed threshold. `None`
+  preserves the old self-fit behaviour, correct only when `df` genuinely
+  is the reference set (e.g. the module's own `__main__` inspection block).
+- `train.py` — fits `feature_params` once on the **training split only**
+  (not train+test combined, to avoid leaking test-set distribution into
+  the fitted parameters) and saves it to `models/feature_params.json`.
+- `score.py` — loads `feature_params.json` and passes it through to every
+  `build_feature_matrix()` call; also now reads `feature_columns` directly
+  from `model.feature_names_in_` (available on any sklearn estimator fit
+  with a DataFrame) instead of recomputing them by re-running the full
+  pipeline over the entire raw dataset on every inference call — a change
+  that is both more efficient and removes another place the same
+  batch-dependent bug could have crept back in.
+- `score_batch()` now short-circuits with an explicit empty result for a
+  0-row input, rather than relying on `predict_proba` happening to handle
+  an empty array correctly.
+
+### 10.5 Retest Evidence
+
+Full pipeline retrained and rerun end-to-end after the fix
+(`python -m src.training.train` then `python -m src.inference.score`):
+metrics are **identical** to the Week 6 run (accuracy/precision/recall/F1/
+ROC-AUC unchanged to 4 decimal places for all 3 models) — confirming the
+fix changes small-batch behaviour without altering full-dataset training
+results, exactly as intended. `python -m pytest tests/ -v` →
+**37 passed, 0 failed** (15 Week 5 unit + 15 Week 6 integration + 7 new
+Week 7 edge-case tests). A pandas deprecation warning surfaced during
+initial testing (`Categorical` construction with out-of-vocabulary values)
+was also fixed rather than left for a future pandas version to turn into
+a hard failure.
+
+### 10.6 Remaining Technical Issues (not addressed this week)
+
+- Issue #13 (missing-column `KeyError` message quality) — low priority,
+  since the normal pipeline path already catches this via
+  `validate_schema()` before it would reach `clean_appointments()`; only
+  reachable if a caller skips validation entirely.
+- Issue #8 (marginal model performance) and #10 (fairness/bias testing) —
+  both carried forward unchanged; neither is a pipeline reliability
+  question, so out of scope for this track's Week 7 testing focus.
+
+### 10.7 Compatibility with Data Science Model Requirements
+
+The fix is compatible with any future model swapped into `MODEL_FACTORY`:
+`fit_feature_params`/`build_feature_matrix` sit entirely upstream of model
+choice, and `model.feature_names_in_` works for any scikit-learn-compatible
+estimator, not just the three currently registered. A genuinely separate
+Data Science contribution does not need to know about this fix at all — it
+receives a correctly, consistently encoded feature matrix regardless of
+batch size, which is the whole point.
+
+### 10.8 Week 8 Readiness Recommendations
+
+- The pipeline is functionally ready for final integration: reproducible,
+  tested against adversarial inputs, and the two skew bugs found this week
+  are the kind that would have been genuinely embarrassing to discover
+  after Week 8's final presentation rather than before it.
+- Recommend Week 8 focus on: final integration with whichever model the
+  Data Science track has settled on, and a final pass on the two remaining
+  open reliability items (#13, and beginning fairness/bias testing #10)
+  if time allows — neither blocks integration.

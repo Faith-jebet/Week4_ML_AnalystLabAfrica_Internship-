@@ -8,48 +8,32 @@
 
 How can HealthConnect Clinic use data and AI to reduce missed appointments and improve the patient support experience?
 
-This repository holds the Machine Learning Engineering track's contribution: the system design, and the working pipeline, needed to turn a no-show prediction model into a reproducible, versioned, production-style service.
-
+This repository holds the Machine Learning Engineering track's contribution: system design (Week 4), a working pipeline (Week 5), integration with a pluggable model registry (Week 6), and — as of Week 7 — that pipeline tested against adversarial/edge-case inputs, with two real bugs found and fixed.
 
 ## Project Status
 
 | Week | Status | Output |
 |---|---|---|
-| Week 4 | ✅ Complete | System design — problem framing, input/output definition, architecture, workflow, dependencies, reproducibility plan |
+| Week 4 | ✅ Complete | System design |
+| Week 5 | ✅ Complete | Working pipeline, 15 passing tests |
+| Week 6 | ✅ Complete | Integrated pipeline: pluggable model comparison, I/O validation, config, logging, 30 passing tests |
+| Week 7 | ✅ Complete | Pipeline tested against edge cases; 2 real train/serve skew bugs found and fixed; 37 passing tests |
+| Week 8 | ⏳ Planned | See `docs/PIPELINE.md` §10.8 |
 
-| Week 5 | ✅ Complete | Working pipeline run end-to-end against the real dataset: validation, cleaning, feature engineering, a baseline model, batch inference, 15 passing tests |
-| Week 6 | ✅ Complete | Integrated pipeline: pluggable model comparison (3 candidates), input/output validation contracts, config wired in, logging added, 30 passing tests (15 unit + 15 integration) |
-| Week 7 | ⏳ Planned | See `docs/PIPELINE.md` §9.6 |
+## Week 7 Deliverables
 
-## Week 6 Deliverables
-
-- [`docs/ML_Integrated_Pipeline_Report.docx`](docs/ML_Integrated_Pipeline_Report.docx) — full Week 6 write-up (Week 5 review, integration gaps, error analysis, model comparison, validation evidence, cross-track integration, issue log)
-- [`docs/Week6_Project_Summary.docx`](docs/Week6_Project_Summary.docx) — concise Week 6 summary and Week 7 focus
-- [`docs/PIPELINE.md`](docs/PIPELINE.md) §9 — technical detail on everything integrated/changed this week
-- [`docs/MODEL_INTERFACE.md`](docs/MODEL_INTERFACE.md) — the data/model contract other tracks build against
-- [`docs/ISSUE_LOG.md`](docs/ISSUE_LOG.md) — 10 issues found this week (7 resolved, 3 open)
-- `src/config.py`, updated `src/training/train.py`, `src/inference/score.py`, `tests/test_integration.py` — the actual working code
+- [`docs/ML_Pipeline_Testing_Reliability_Report.docx`](docs/ML_Pipeline_Testing_Reliability_Report.docx) — full Week 7 write-up (Week 6 review, test plan, test results table, root cause analysis, fix implementation, retest evidence, HC-POD cross-track testing, updated risk register)
+- [`docs/Week7_Project_Summary.docx`](docs/Week7_Project_Summary.docx) — concise summary and Week 8 focus
+- [`docs/PIPELINE.md`](docs/PIPELINE.md) §10 — full technical detail on the two bugs found and fixed this week
+- [`docs/ISSUE_LOG.md`](docs/ISSUE_LOG.md) — updated with 3 new Week 7 issues (#11, #12 resolved; #13 open)
+- `tests/test_integration.py` — 7 new edge-case regression tests (single-row batch, skewed batch, empty batch, all-Cancelled batch, unseen category, missing column, fixed threshold)
+- [`notebooks/HealthConnect_ML_Pipeline_Walkthrough.ipynb`](notebooks/HealthConnect_ML_Pipeline_Walkthrough.ipynb) — a supporting, fully-executed notebook that runs the entire pipeline end-to-end (load → validate → clean → engineer features → train/compare 3 models → score a batch → reproduce and fix the two Week 7 bugs live → run the test suite), so a reviewer can see it all work in one place without opening five separate files
 
 ## Earlier Deliverables (still current)
 
+- Week 6: [`docs/ML_Integrated_Pipeline_Report.docx`](docs/ML_Integrated_Pipeline_Report.docx), [`docs/Week6_Project_Summary.docx`](docs/Week6_Project_Summary.docx), [`docs/MODEL_INTERFACE.md`](docs/MODEL_INTERFACE.md)
 - Week 5: [`docs/ML_Pipeline_Implementation_Report.docx`](docs/ML_Pipeline_Implementation_Report.docx), [`docs/Week5_Project_Summary.docx`](docs/Week5_Project_Summary.docx)
 - Week 4: [`docs/ML_System_Design_Document.docx`](docs/ML_System_Design_Document.docx), [`docs/Week4_Project_Summary.docx`](docs/Week4_Project_Summary.docx), [`docs/architecture.png`](docs/architecture.png)
-
-| Week 5 | ✅ Complete | Working pipeline run end-to-end against the real dataset: validation, cleaning, feature engineering, a baseline model integration, batch inference, and a passing test suite |
-| Week 6 | ⏳ Planned | See "Next Steps" below |
-
-## Week 5 Deliverables
-
-- [`docs/ML_Pipeline_Implementation_Report.docx`](docs/ML_Pipeline_Implementation_Report.docx) — full Week 5 write-up (Week 4 review, data-processing pipeline, feature engineering, baseline model integration, testing evidence, cross-track collaboration, updated risk register)
-- [`docs/Week5_Project_Summary.docx`](docs/Week5_Project_Summary.docx) — concise Week 5 summary and Week 6 focus
-- [`docs/PIPELINE.md`](docs/PIPELINE.md) — technical pipeline documentation, data-quality findings, and testing evidence
-- `src/`, `tests/`, `data/processed/`, `models/` — the actual working code and its output (see below)
-
-## Week 4 Deliverables (still current — design foundation)
-
-- [`docs/ML_System_Design_Document.docx`](docs/ML_System_Design_Document.docx)
-- [`docs/Week4_Project_Summary.docx`](docs/Week4_Project_Summary.docx)
-- [`docs/architecture.png`](docs/architecture.png)
 
 ## Repository Structure
 
@@ -58,29 +42,20 @@ healthconnect-ml-engineering/
 ├── data/
 │   ├── raw/               # HealthConnect_Appointment_Data.csv — never edited in place, not committed to git
 │   └── processed/          # appointments_cleaned.csv, scored_batch_sample.csv — tracked as evidence
-├── notebooks/               # Reserved for future EDA/experimentation notebooks
+├── notebooks/               # HealthConnect_ML_Pipeline_Walkthrough.ipynb — supporting artefact, run end-to-end
 ├── src/
-│   ├── config.py             # Week 6: get_config() / get_logger() — wires config.yaml + logging into every module
-│   ├── data/                 # validate.py (schema, consistency, + Week 6 feature-contract check), clean.py
-│   ├── features/              # build_features.py (target + engineered features; Week 6: drops redundant raw history columns)
-│   ├── training/               # train.py (Week 6: pluggable MODEL_FACTORY, comparison, candidate promotion)
-│   ├── inference/               # score.py (Week 6: loads recommended candidate, validates output before saving)
-│   └── monitoring/             # monitor.py (still a design stub — Week 7)
+│   ├── config.py             # get_config() / get_logger()
+│   ├── data/                 # validate.py, clean.py
+│   ├── features/              # build_features.py — Week 7: fit_feature_params() fixes train/serve skew (see docs/ISSUE_LOG.md #11/#12)
+│   ├── training/               # train.py — fits and saves feature_params.json alongside each model
+│   ├── inference/               # score.py — loads feature_params.json + model.feature_names_in_, handles empty batches explicitly
+│   └── monitoring/             # monitor.py (still a design stub — Week 8)
 ├── tests/
 │   ├── test_pipeline.py         # 15 Week 5 unit tests
-│   └── test_integration.py      # 15 Week 6 integration tests (config, model registry, contracts, reproducibility)
-├── models/                       # Versioned model artefacts (.joblib), model_registry_log.csv, model_comparison_*.json
+│   └── test_integration.py      # 22 tests: 15 Week 6 integration + 7 Week 7 edge-case/regression
+├── models/                       # Versioned model artefacts, model_registry_log.csv, feature_params.json, model_comparison_*.json
 ├── docs/                          # Design + weekly reports, diagrams, pipeline/model/issue documentation
-├── config.yaml                    # Now actually loaded — see src/config.py
-│   ├── data/                # validate.py (schema + consistency checks), clean.py (imputation)
-│   ├── features/             # build_features.py (target + engineered features, shared by train & inference)
-│   ├── training/              # train.py (time-aware split, baseline model, registry logging)
-│   ├── inference/             # score.py (batch scoring using the same feature pipeline)
-│   └── monitoring/            # monitor.py (design stub — Week 6+)
-├── tests/                      # test_pipeline.py — 15 tests, run with pytest
-├── models/                     # Versioned model artefacts (.joblib) + model_registry_log.csv
-├── docs/                       # Design + Week 5 reports, diagrams, pipeline documentation
-├── config.yaml                 # Central settings reference (not yet wired into modules — see docs/PIPELINE.md)
+├── config.yaml
 └── requirements.txt
 ```
 
@@ -94,116 +69,64 @@ pip install -r requirements.txt
 python -m src.data.validate       # data-quality report against the real dataset
 python -m src.data.clean          # writes data/processed/appointments_cleaned.csv
 python -m src.features.build_features   # sanity-checks the feature matrix
-python -m src.training.train      # trains 3 candidate models, compares, registers the recommended one
-python -m src.inference.score     # loads the recommended model, validates I/O, batch-scores appointments
-python -m pytest tests/ -v        # 30 tests should pass
+python -m src.training.train      # trains 3 candidates, fits+saves feature_params.json, registers the recommended model
+python -m src.inference.score     # loads the recommended model + feature_params.json, validates I/O, batch-scores
+python -m pytest tests/ -v        # 37 tests should pass
 ```
 
-Full explanation of every stage, real data-quality findings, error analysis
-of the Week 5 baseline, the model comparison results, and testing evidence:
-see [`docs/PIPELINE.md`](docs/PIPELINE.md).
-
-python -m src.training.train      # fits + registers a baseline model (smoke test)
-python -m src.inference.score     # batch-scores appointments with the saved model
-python -m pytest tests/ -v        # 15 tests should pass
-```
-
-Full explanation of each stage, real data-quality findings (including a
-Data Dictionary discrepancy discovered while implementing this), feature
-rationale, baseline metrics, and testing evidence: see
-[`docs/PIPELINE.md`](docs/PIPELINE.md).
-
-
-## System Overview
-
-The system separates an **offline training pipeline** (validation → cleaning →
-feature engineering → model comparison → model registry) from an **online
-batch inference pipeline** (load the recommended model → validate the input
-contract → score → validate the output → risk tier). See
-`docs/ML_System_Design_Document.docx` for the original Week 4 architecture,
-`docs/MODEL_INTERFACE.md` for the exact contracts, and `docs/PIPELINE.md` for
-implementation detail.
-
-feature engineering → model training → evaluation → model registry) from an
-**online batch inference pipeline** (load latest model → same feature pipeline
-→ score → risk tier output). See `docs/ML_System_Design_Document.docx` for the
-full Week 4 architecture and `docs/PIPELINE.md` for how it was implemented.
+Full technical detail — data-quality findings, error analysis, model
+comparison, and the Week 7 edge-case testing that found and fixed two real
+bugs — is in [`docs/PIPELINE.md`](docs/PIPELINE.md).
 
 ## Key Decisions
 
 - **Target:** binary — `is_no_show` (1 = No-Show, 0 = Attended). `Cancelled`
-  rows are dropped from the modelling set entirely (5.3% of raw data).
-- **Excluded features:** `waiting_time_minutes` (never available before an
-  appointment happens), plus (Week 6) `previous_appointments`/
-  `previous_no_shows` — redundant with the engineered `no_show_rate_history`
-  and shown to cause multicollinearity in the baseline (see `ISSUE_LOG.md`).
-- **Model:** 3 candidates compared on the same time-aware split;
-  `refined_logreg` recommended, mainly for interpretability at equal
-  performance — **not yet approved for production**, pending Data Science
-  track review (see `MODEL_INTERFACE.md` §4).
-- **Split:** time-aware (chronological on `appointment_date`), not random.
-- **Cadence:** daily batch scoring remains the working assumption.
-  rows are dropped from the modelling set entirely (5.3% of raw data), not
-  encoded as 0 — confirmed as the right call after Week 5 data exploration
-  (see Cross-Track Collaboration in the Week 5 report).
-- **Excluded feature:** `waiting_time_minutes` — never available before an
-  appointment happens. Week 5 found it's even populated for No-Show/Cancelled
-  rows in this dataset with a near-identical distribution across outcomes,
-  reinforcing that it carries no real signal and must stay excluded.
-- **Split:** time-aware (chronological on `appointment_date`), not random.
-- **Cadence:** daily batch scoring remains the working assumption.
-- **Model management:** versioned `.joblib` files + a CSV metadata log.
+  rows dropped from modelling entirely.
+- **Excluded features:** `waiting_time_minutes`, plus `previous_appointments`/
+  `previous_no_shows` (redundant with `no_show_rate_history`).
+- **Model:** 3 candidates compared; `refined_logreg` recommended, mainly for
+  interpretability at equal performance — **not yet approved for production**.
+- **Feature encoding (Week 7):** category levels and the `long_lead_time`
+  threshold are now fit once on the training set and reused unchanged at
+  inference, fixing two real bugs where small/skewed batches were encoded
+  inconsistently with how the model was trained. See `docs/ISSUE_LOG.md` #11/#12.
 
 ## Data Sources
 
 - `HealthConnect_Appointment_Data.csv` — 5,000 fictional, anonymised appointment
-  records (provided by AnalystLab Africa). Kept in `data/raw/` locally, **not
-  committed to git** (see `.gitignore`) — uploaded to Google Drive per the
-  submission requirements instead.
-- `HealthConnect_Data_Dictionary` — variable definitions (provided by AnalystLab Africa).
-
-Original resources are never overwritten; all cleaned/processed/scored data is
-saved separately under `data/processed/`.
+  records (provided by AnalystLab Africa). Kept in `data/raw/` locally, not
+  committed to git — uploaded to Google Drive per submission requirements.
+- `HealthConnect_Data_Dictionary` — variable definitions.
 
 ## Testing
-`pytest tests/ -v` → **30 passed** (15 unit + 15 integration). New in Week 6:
-model-registry tests, input/output contract tests, and a reproducibility test
-that actually shells out and runs the documented commands above rather than
-just asserting the code "should" work. See `docs/PIPELINE.md` §9.4.
 
-## Cross-Track Integration (Week 6)
+`pytest tests/ -v` → **37 passed** (15 unit + 15 Week 6 integration + 7 Week 7
+edge-case). New in Week 7: tests that deliberately probe single-row batches,
+skewed batches, empty batches, all-Cancelled batches, unseen categories, and
+missing columns — the kind of inputs a real deployment would actually see,
+which full-dataset-only testing in Weeks 5–6 never exercised. See
+`docs/PIPELINE.md` §10.2 for the full before/after results table.
 
-This track's Week 6 work is built around the dependency flagged in Week 5:
-**Data Science → ML Engineering, candidate model informs pipeline
-integration.** Since this internship is being completed independently, the
-Data Science side of that exchange (error analysis + an improved model) was
-completed within this track to produce a concrete artefact to integrate —
-kept clearly labelled as such throughout (`docs/ISSUE_LOG.md`, `MODEL_INTERFACE.md`
-§4) rather than presented as a separate team's output. The pipeline's
-`MODEL_FACTORY` interface (§`MODEL_INTERFACE.md`) is what a genuinely
-separate Data Science contribution would plug into.
+## Cross-Track Testing (Week 7)
 
-## Next Steps (Week 7)
+Per the HC-POD testing matrix (Data Science ↔ ML Engineering: "test whether
+the integrated pipeline correctly handles model requirements and expected
+inputs/outputs"), this week's testing directly validated that claim: every
+registered model (including any future Data Science contribution added to
+`MODEL_FACTORY`) now receives a feature matrix that is provably identical in
+shape regardless of batch size, via `model.feature_names_in_` and
+`fit_feature_params()`. Since this internship is being completed
+independently, both sides of this test were completed within this track and
+documented transparently rather than presented as a separate contribution —
+see `docs/ML_Pipeline_Testing_Reliability_Report.docx` §6 for the full
+Test → Finding → Action → Retest record.
 
-- Integrate a genuinely separate Data Science candidate model if/when
-  available, alongside the existing comparison (not a replacement).
-- Begin implementing `src/monitoring/monitor.py` — data-drift checks first.
-- Fairness/bias testing on `gender` and `age` (carried forward, still open).
-- Broader edge-case testing (see `docs/PIPELINE.md` §9.6).
-`pytest tests/ -v` → **15 passed**. Covers schema validation, consistency
-checks, cleaning completeness, target construction, and feature-leakage
-prevention. See `docs/PIPELINE.md` §6 for details.
+## Next Steps (Week 8)
 
-## Next Steps (Week 6)
+- Final integration with whichever model the Data Science track settles on.
+- Address Issue #13 (unclear `KeyError` on a missing required column) if time allows.
+- Begin fairness/bias testing on `gender` and `age` (carried forward, still open).
+- Prepare final presentation materials.
 
-- Wire `config.yaml` into the modules instead of hard-coded paths/settings.
-- Replace the baseline Logistic Regression with whatever model the Data
-  Science track finalises; keep the registry/inference scaffolding as-is.
-- Save a fitted encoder object alongside the model so inference-time category
-  handling is robust to categories unseen in training.
-- Begin wiring batch inference to a simulated "daily new appointments" feed
-  rather than a held-out historical slice.
-
-
-
-
+---
+*Tagging #AnalystLabAfrica*

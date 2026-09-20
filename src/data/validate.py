@@ -122,7 +122,6 @@ def validate_feature_matrix_contract(df: pd.DataFrame, expected_columns: list) -
     return issues
 
 
-
 if __name__ == "__main__":
     path = "data/raw/HealthConnect_Appointment_Data.csv"
     print(f"Loading: {path}")

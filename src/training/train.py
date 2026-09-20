@@ -39,15 +39,15 @@ from sklearn.metrics import (
 )
 
 from src.config import get_config, get_logger
-
 from src.data.clean import clean_appointments
 from src.data.validate import load_data
-from src.features.build_features import build_target, build_feature_matrix
+from src.features.build_features import build_target, build_feature_matrix, fit_feature_params
 
 log = get_logger("training")
 
 MODELS_DIR = Path("models")
 REGISTRY_LOG = MODELS_DIR / "model_registry_log.csv"
+FEATURE_PARAMS_PATH = MODELS_DIR / "feature_params.json"
 
 MODEL_FACTORY = {
     "baseline_logreg": lambda: LogisticRegression(max_iter=1000),
@@ -59,14 +59,7 @@ MODEL_FACTORY = {
 
 
 def time_aware_split(df: pd.DataFrame, date_col: str, test_frac: float = 0.2):
-    """
-    Split chronologically on appointment_date rather than randomly.
-
-    Rationale: in production, the model will always be scoring appointments
-    that are chronologically AFTER the data it was trained on. A random
-    split would let the model "see the future" relative to some of its own
-    training data and overstate how well it will generalise once deployed.
-    """
+    """Chronological split on date_col — see module docstring in Week 5 version for rationale."""
     df_sorted = df.sort_values(date_col)
     cutoff_idx = int(len(df_sorted) * (1 - test_frac))
     cutoff_date = df_sorted.iloc[cutoff_idx][date_col]
@@ -120,10 +113,17 @@ def run():
     log.info("Time-aware split cutoff: %s | train=%d test=%d",
               cutoff.date(), len(train_raw), len(test_raw))
 
-    # Build features on train and test separately using the SAME function,
-    # then align columns (test may lack a rare category present in train).
-    train_feat = build_feature_matrix(train_raw)
-    test_feat = build_feature_matrix(test_raw)
+    # Week 7: fit feature params (category levels, long_lead_time threshold) ONCE on
+    # the training split only, then reuse unchanged for both train and test — fixes
+    # the train/serve skew found in edge-case testing (see build_features.py docstring).
+    feature_params = fit_feature_params(train_raw)
+    MODELS_DIR.mkdir(exist_ok=True)
+    with open(FEATURE_PARAMS_PATH, "w") as f:
+        json.dump(feature_params, f, indent=2)
+    log.info("Fitted feature params saved to %s", FEATURE_PARAMS_PATH)
+
+    train_feat = build_feature_matrix(train_raw, feature_params)
+    test_feat = build_feature_matrix(test_raw, feature_params)
     y_train = train_raw["is_no_show"].values
     y_test = test_raw["is_no_show"].values
     X_train = train_feat.drop(columns=["is_no_show"], errors="ignore")
